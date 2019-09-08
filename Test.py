@@ -1,4 +1,5 @@
-#Fighting Game Input System Test by Isa Bolling
+#!/usr/bin/env python3
+# Fighting Game Input System Test by Isa Bolling
 import os
 os.environ['PYSDL2_DLL_PATH'] = os.path.dirname(os.path.abspath(__file__))
 from sdl2 import *
