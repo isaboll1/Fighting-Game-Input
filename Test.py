@@ -62,13 +62,13 @@ class InputNode:
         return self.__children.get(button, None)
 
 
-class InputSystem:       # I will draw out how this works on paper.
+class CommandSystem:       # I will draw out how this works on paper.
     def __init__(self):
         self.__root = InputNode('')
 
-    def AddMove(self, queue, move):
+    def AddMove(self, command_list, move):
         node = self.__root
-        for button in queue:
+        for button in command_list:
             if node.GetChild(button) is None:
                 node.AddChild(button)
             node = node.GetChild(button)
@@ -76,10 +76,55 @@ class InputSystem:       # I will draw out how this works on paper.
 
     def GetMove(self, queue):
         node = self.__root
-        for button in queue:
-            if node.GetChild(button) is not None:
-                node = node.GetChild(button)
+        for i in range(len(queue.queue)):
+            if node.move_name:
+                return node.move_name
+            if node.GetChild(queue.queue[i].button) is not None:
+                node = node.GetChild(queue.queue[i].button)
         return node.move_name if node.move_name else None
+
+
+class QueueNode:
+    def __init__(self, button):
+        self.button = button
+        self.time = 0
+
+
+class InputQueue:
+    def __init__(self):
+        self.queue = []
+
+    def AddInput(self, input):
+        self.queue.append(QueueNode(input))
+
+    def Dequeue(self):
+        return self.queue.pop(0)
+
+    def Update(self, dt_s, buffer_time):
+        for input in self.queue:
+            input.time += dt_s
+
+        last_input = None
+        for input in self.queue:
+            if last_input:
+                if last_input.time >= buffer_time:
+                    expired = self.queue.pop()
+                    del expired
+            last_input = input
+
+        if last_input:
+            if last_input.time >= buffer_time:
+                expired = self.queue.pop()
+                del expired
+
+    def Clear(self):
+        self.queue.clear()
+
+    def Print(self):
+        queue = []
+        for input in self.queue:
+            queue.append(input.button)
+        print(queue)
 
 
 class Controllers:
@@ -118,17 +163,17 @@ class Controllers:
         SDL_GameControllerClose(controller)
 
     def GetButton(self, index, button):
-        if index <= (self.amount - 1):
+        if 0 <= index <= (self.amount - 1):
             return SDL_GameControllerGetButton(self.list[index], self._button_map[button])
 
     def GetTrigger(self, index, trigger):
-        if index <= (self.amount - 1):
+        if 0 <= index <= (self.amount - 1):
             # Trigger values range from 0 to 32767,
             # so we divide by that to get a range of numbers from 0 to 1,
             # that is normalization.
             if trigger == 'LT' or trigger == 'RT':
                 return (SDL_GameControllerGetAxis(self.list[index], self._axis_map[trigger]) / 32767)
-            return 0
+        return 0
 
 def main():
 
@@ -137,22 +182,20 @@ def main():
 
     window = SDL_CreateWindow(b'FGI System Test', SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               640, 480, SDL_WINDOW_SHOWN)
-    renderer = SDL_CreateRenderer(window, -1, 0)
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC)
     event = SDL_Event()
 
     # Variables
     running = True
-    input_queue = []
     move = ''
-    input_process = False
     connected = False
     input_timer = 0
-    queue_timer = 0
     message_timer = 0
 
     # Objects
+    input_queue = InputQueue()
     text = DynamicTextObject(renderer, 'font/joystix.ttf', 13)
-    input_system = InputSystem()
+    input_system = CommandSystem()
     controllers = Controllers()
     clock = Clock()
 
@@ -160,13 +203,15 @@ def main():
     input_system.AddMove(['↓','↘','→','P'], 'Fireball')
     input_system.AddMove(['→','↓','↘','P'], 'Shoryu')
     input_system.AddMove(['↓','↙','←','K'], 'Tatsu')
-    input_system.AddMove(['→','↘', '↓', '↙','←', 'P', 'K'], 'The Grab No One Likes')
+    input_system.AddMove(['→','↘', '↓', '↙','←', 'G'], 'The Grab No One Likes') # have to fix in the next iteration
+    input_system.AddMove(['←','←','←','←', '→', 'P'], 'Napalm Shot')
     input_system.AddMove(['↓','↘','→','↓','↘','→', 'P', 'P'], 'Super Fireball')
-    input_system.AddMove(['P', 'K'], 'Grab')
-    input_system.AddMove(['K', 'P'], 'Grab')
+    input_system.AddMove(['G'],'Grab')
 
     while (running):
         clock.Tick()
+        input_queue.Update(clock.dt_s, .7)
+        keyboard = SDL_GetKeyboardState(None)
         # Event Processing
         while (SDL_PollEvent(ctypes.byref(event))):
             if event.type == SDL_CONTROLLERBUTTONDOWN:
@@ -191,50 +236,54 @@ def main():
             message_timer = 0
             connected = False
 
-        if input_process:
-            input_timer += clock.dt_s
-            queue_timer += clock.dt_s
 
-            if input_timer >= .03:
-                input_timer = 0
-                if controllers.GetButton(0, "UP") and controllers.GetButton(0, "LEFT"):
-                    input_queue.append('↖')
-                elif controllers.GetButton(0, 'UP') and controllers.GetButton(0, 'RIGHT'):
-                    input_queue.append('↗')
-                elif controllers.GetButton(0, 'DOWN') and controllers.GetButton(0, 'LEFT'):
-                    input_queue.append('↙')
-                elif controllers.GetButton(0, 'DOWN') and controllers.GetButton(0, 'RIGHT'):
-                    input_queue.append('↘')
+        input_timer += clock.dt_s
 
-                elif controllers.GetButton(0, 'UP'):
-                    input_queue.append('↑')
-                elif controllers.GetButton(0, 'DOWN'):
-                    input_queue.append('↓')
-                elif controllers.GetButton(0, 'LEFT'):
-                    input_queue.append('←')
-                elif controllers.GetButton(0, 'RIGHT'):
-                    input_queue.append('→')
+        if input_timer >= .08:
+            input_timer = 0
+            if ((controllers.GetButton(0, "UP") and controllers.GetButton(0, "LEFT"))
+            or (keyboard[SDL_SCANCODE_UP] and keyboard[SDL_SCANCODE_LEFT])):
+                input_queue.AddInput('↖')
+            elif ((controllers.GetButton(0, 'UP') and controllers.GetButton(0, 'RIGHT'))
+            or (keyboard[SDL_SCANCODE_UP] and keyboard[SDL_SCANCODE_RIGHT])):
+                input_queue.AddInput('↗')
+            elif ((controllers.GetButton(0, 'DOWN') and controllers.GetButton(0, 'LEFT'))
+            or (keyboard[SDL_SCANCODE_DOWN] and keyboard[SDL_SCANCODE_LEFT])):
+                input_queue.AddInput('↙')
+            elif ((controllers.GetButton(0, 'DOWN') and controllers.GetButton(0, 'RIGHT'))
+            or (keyboard[SDL_SCANCODE_DOWN] and keyboard[SDL_SCANCODE_RIGHT])):
+                input_queue.AddInput('↘')
 
-                if controllers.GetButton(0, 'X'):
-                    input_queue.append('P')
-                if controllers.GetButton(0, 'Y'):
-                    input_queue.append('P')
-                if controllers.GetButton(0, 'RB'):
-                    input_queue.append('P')
-                if controllers.GetButton(0, 'A'):
-                    input_queue.append('K')
-                if controllers.GetButton(0, 'B'):
-                    input_queue.append('K')
-                if controllers.GetTrigger(0, 'RT') >= 0.3:
-                    input_queue.append('K')
+            elif controllers.GetButton(0, 'UP') or keyboard[SDL_SCANCODE_UP]:
+                input_queue.AddInput('↑')
+            elif controllers.GetButton(0, 'DOWN') or keyboard[SDL_SCANCODE_DOWN]:
+                input_queue.AddInput('↓')
+            elif controllers.GetButton(0, 'LEFT') or keyboard[SDL_SCANCODE_LEFT]:
+                input_queue.AddInput('←')
+            elif controllers.GetButton(0, 'RIGHT') or keyboard[SDL_SCANCODE_RIGHT]:
+                input_queue.AddInput('→')
 
-            if queue_timer >= .4:
-                queue_timer = 0
-                input_process = False
-                attack = input_system.GetMove(input_queue)
-                if attack is not None:
-                    move = attack
-                input_queue.clear()
+            if ((controllers.GetButton(0, 'X') and controllers.GetButton(0, 'A'))
+            or (keyboard[SDL_SCANCODE_Z] and keyboard[SDL_SCANCODE_A])):
+                input_queue.AddInput('G')
+            if controllers.GetButton(0, 'X') or keyboard[SDL_SCANCODE_Z]:
+                input_queue.AddInput('P')
+            if controllers.GetButton(0, 'Y') or keyboard[SDL_SCANCODE_X]:
+                input_queue.AddInput('P')
+            if controllers.GetButton(0, 'RB') or keyboard[SDL_SCANCODE_C]:
+                input_queue.AddInput('P')
+            if controllers.GetButton(0, 'A') or keyboard[SDL_SCANCODE_A]:
+                input_queue.AddInput('K')
+            if controllers.GetButton(0, 'B') or keyboard[SDL_SCANCODE_S]:
+                input_queue.AddInput('K')
+            if controllers.GetTrigger(0, 'RT') >= 0.3 or keyboard[SDL_SCANCODE_D]:
+                input_queue.AddInput('K')
+
+        input_queue.Print()
+        attack = input_system.GetMove(input_queue)
+        if attack is not None:
+            move = attack
+            input_queue.Clear()
 
         # Game Rendering
         SDL_SetRenderDrawColor(renderer, 242, 242, 242, 255)
