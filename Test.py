@@ -206,8 +206,9 @@ def main():
     input_system.AddMove(['→','↘', '↓', '↙','←', 'G'], 'The Grab No One Likes') # have to fix in the next iteration
     input_system.AddMove(['←','←','←','←', '→', 'P'], 'Napalm Shot')
     input_system.AddMove(['↓','↘','→','↓','↘','→', 'P', 'P'], 'Super Fireball')
+    input_system.AddMove(['P'], "Punch")
+    input_system.AddMove(['K'], 'Kick')
     input_system.AddMove(['G'],'Grab')
-
     while (running):
         clock.Tick()
         input_queue.Update(clock.dt_s, .7)
