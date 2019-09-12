@@ -119,7 +119,8 @@ class InputQueue:
                 del expired
 
     def Clear(self):
-        self.queue.clear()
+        del self.queue[:]
+        self.queue[:] = []
 
     def Print(self):
         queue = []
