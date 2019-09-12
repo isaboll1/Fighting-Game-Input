@@ -74,13 +74,13 @@ class CommandSystem:       # I will draw out how this works on paper.
             node = node.GetChild(button)
         node.move_name = move
 
-    def GetMove(self, queue):
+    def GetMove(self, input_queue):
         node = self.__root
-        for i in range(len(queue.queue)):
+        for i in range(len(input_queue.queue)):
             if node.move_name:
                 return node.move_name
-            if node.GetChild(queue.queue[i].button) is not None:
-                node = node.GetChild(queue.queue[i].button)
+            if node.GetChild(input_queue.queue[i].button) is not None:
+                node = node.GetChild(input_queue.queue[i].button)
         return node.move_name if node.move_name else None
 
 
@@ -98,7 +98,7 @@ class InputQueue:
         self.queue.append(QueueNode(input))
 
     def Dequeue(self):
-        return self.queue.pop(0)
+        return self.queue.pop()
 
     def Update(self, dt_s, buffer_time):
         for input in self.queue:
@@ -108,13 +108,13 @@ class InputQueue:
         for input in self.queue:
             if last_input:
                 if last_input.time >= buffer_time:
-                    expired = self.queue.pop()
+                    expired = self.Dequeue()
                     del expired
             last_input = input
 
         if last_input:
             if last_input.time >= buffer_time:
-                expired = self.queue.pop()
+                expired = self.Dequeue()
                 del expired
 
     def Clear(self):
@@ -207,11 +207,14 @@ def main():
     input_system.AddMove(['←','←','←','←', '→', 'P'], 'Napalm Shot')
     input_system.AddMove(['↓','↘','→','↓','↘','→', 'P', 'P'], 'Super Fireball')
     input_system.AddMove(['P'], "Punch")
+    input_system.AddMove(['→', 'P'],'Forward Punch')
     input_system.AddMove(['K'], 'Kick')
+    input_system.AddMove(['→', 'K'], 'Forward Kick')
     input_system.AddMove(['G'],'Grab')
+    input_system.AddMove(['↓','↘','→','G'], 'Super Grab')
     while (running):
         clock.Tick()
-        input_queue.Update(clock.dt_s, .7)
+        input_queue.Update(clock.dt_s, .6)
         keyboard = SDL_GetKeyboardState(None)
         # Event Processing
         while (SDL_PollEvent(ctypes.byref(event))):
