@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # Fighting Game Input System Test by Isa Bolling
 import os
 os.environ['PYSDL2_DLL_PATH'] = os.path.dirname(os.path.abspath(__file__))
@@ -118,7 +119,8 @@ class InputQueue:
                 del expired
 
     def Clear(self):
-        self.queue.clear()
+        del self.queue[:]
+        self.queue[:] = []
 
     def Print(self):
         queue = []
