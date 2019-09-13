@@ -214,6 +214,7 @@ def main():
     input_system.AddMove(['→', 'K'], 'Forward Kick')
     input_system.AddMove(['G'],'Grab')
     input_system.AddMove(['↓','↘','→','G'], 'Super Grab')
+
     while (running):
         clock.Tick()
         input_queue.Update(clock.dt_s, .6)
